@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "gitlab-metrics.fullname" . }}
+  labels:
+    {{- include "gitlab-metrics.labels" . | nindent 4 }}
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "gitlab-metrics.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "gitlab-metrics.selectorLabels" . | nindent 8 }}
+    spec:
+    {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: GITLAB_URL
+              value: {{ .Values.gitlabUrl | quote }}
+            - name: GITLAB_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  {{ if .Values.tokenSecret }}
+                  name: {{ .Values.tokenSecret }}
+                  {{ else }}
+                  name: {{ template "gitlab-metrics.fullname" . }}
+                  {{ end }}
+                  key: token
+            - name: DB_HOST
+              {{- if .Values.postgresql.host }}
+              value: {{ .Values.postgresql.host | quote }}
+              {{- else }}
+              value: {{ template "gitlab-metrics.fullname" . }}-postgresql
+              {{- end }}
+            - name: DB_PORT
+              value: {{ .Values.postgresql.service.port | quote }}
+            - name: DB_USER
+              value: {{ .Values.postgresql.postgresqlUsername | quote }}
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  {{- if .Values.postgresql.existingSecret }}
+                  name: {{ .Values.postgresql.existingSecret }}
+                  {{- else }}
+                  name: {{ template "gitlab-metrics.fullname" . }}-postgresql
+                  {{- end }}
+                  key: postgresql-password
+            - name: DB_NAME
+              value: {{ .Values.postgresql.postgresqlDatabase | quote }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          livenessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 100
+            timeoutSeconds: 3
+            periodSeconds: 8
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 10
+            timeoutSeconds: 3
+            periodSeconds: 8
+            failureThreshold: 3
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+    {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}
+    {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+    {{- end }}

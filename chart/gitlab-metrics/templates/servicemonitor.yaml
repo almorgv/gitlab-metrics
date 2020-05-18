@@ -1,0 +1,32 @@
+{{- if and ( .Capabilities.APIVersions.Has "monitoring.coreos.com/v1" ) ( .Values.serviceMonitor.enabled ) }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  {{- if .Values.serviceMonitor.labels }}
+  labels:
+  {{ toYaml .Values.serviceMonitor.labels | indent 4}}
+  {{- end }}
+  name: {{ template "gitlab-metrics.fullname" . }}
+  {{- if .Values.serviceMonitor.namespace }}
+  namespace: {{ .Values.serviceMonitor.namespace }}
+  {{- end }}
+spec:
+  endpoints:
+    - targetPort: http
+      {{- if .Values.serviceMonitor.interval }}
+      interval: {{ .Values.serviceMonitor.interval }}
+      {{- end }}
+      {{- if .Values.serviceMonitor.path }}
+      path: {{ .Values.serviceMonitor.path }}
+      {{- end }}
+      {{- if .Values.serviceMonitor.timeout }}
+      scrapeTimeout: {{ .Values.serviceMonitor.timeout }}
+  {{- end }}
+  jobLabel: {{ template "gitlab-metrics.fullname" . }}
+  namespaceSelector:
+    matchNames:
+      - {{ .Release.Namespace }}
+  selector:
+    matchLabels:
+      {{- include "gitlab-metrics.selectorLabels" . | nindent 6 }}
+{{- end }}
