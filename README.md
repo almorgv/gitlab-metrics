@@ -1,5 +1,7 @@
 # gitlab-metrics
 
+Collect projects events from Gitlab and store it in PostgreSQL
+
 ## Configuration via environment
 
 - `DB_HOST` - Database host
